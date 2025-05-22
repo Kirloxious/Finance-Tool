@@ -24,10 +24,11 @@ impl fmt::Display for InvalidAccountType {
 impl FromStr for AccountType {
     type Err = InvalidAccountType;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
+        match s.to_lowercase().trim() {
             "savings" => Ok(AccountType::Savings),
             "credit" => Ok(AccountType::Credit),
             "chequing" => Ok(AccountType::Chequing),
+            "checking" => Ok(AccountType::Chequing),
             _ => Err(InvalidAccountType),
         }
     }
@@ -44,6 +45,7 @@ impl fmt::Display for AccountType {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum Account {
     Savings(SavingsAccount),
     Credit(CreditAccount),
@@ -128,9 +130,8 @@ impl BankAccount for Account {
     }
 
     fn set_credit_limit(&mut self, limit: f64) {
-        match self {
-            Account::Credit(account) => account.set_credit_limit(limit),
-            _ => (),
+        if let Account::Credit(account) = self {
+            account.set_credit_limit(limit)
         }
     }
 
@@ -158,6 +159,7 @@ pub trait BankAccount {
     fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error>;
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct SavingsAccount {
     pub user_id: i64,
     pub account_number: i64,
@@ -216,7 +218,7 @@ impl BankAccount for SavingsAccount {
     }
 
     fn set_credit_limit(&mut self, _limit: f64) {
-        0.0;
+        todo!();
     }
 
     fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error> {
@@ -229,6 +231,7 @@ impl BankAccount for SavingsAccount {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct CreditAccount {
     pub user_id: i64,
     pub account_number: i64,
@@ -307,6 +310,7 @@ impl BankAccount for CreditAccount {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ChequingAccount {
     pub user_id: i64,
     pub account_number: i64,
@@ -357,7 +361,7 @@ impl BankAccount for ChequingAccount {
     }
 
     fn set_credit_limit(&mut self, _limit: f64) {
-        0.0;
+        todo!();
     }
 
     fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error> {

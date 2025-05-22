@@ -14,9 +14,7 @@ lazy_static! {
     static ref CLIENT: Client = Client::new();
 }
 
-pub async fn catergorize_transactions(
-    transaction: &Vec<Transaction>,
-) -> Result<Vec<String>, Error> {
+pub async fn catergorize_transactions(transaction: &[Transaction]) -> Result<Vec<String>, Error> {
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
     headers.insert("x-api-key", "fina-api-test".parse().unwrap());

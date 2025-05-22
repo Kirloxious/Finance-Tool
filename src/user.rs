@@ -33,7 +33,10 @@ impl User {
 
 impl Default for User {
     fn default() -> Self {
-        User::new("John Doe".to_string())
+        User {
+            name: "".into(),
+            id: 0,
+        }
     }
 }
 

@@ -85,6 +85,19 @@ impl Database {
         Ok(())
     }
 
+    pub fn get_transactions(&self, user_id: i64) -> Result<Vec<Transaction>> {
+        let conn = self.get_connection();
+        let mut stmt = conn.prepare("SELECT * FROM Transactions WHERE user_id = :user_id")?;
+        let rows = stmt.query_map(named_params! {":user_id": user_id}, |row| {
+            Transaction::from_row(row)
+        })?;
+        let mut transactions = Vec::new();
+        for row in rows {
+            transactions.push(row?);
+        }
+        Ok(transactions)
+    }
+
     pub fn insert_user(&self, user: &User) -> Result<()> {
         let conn = self.get_connection();
         conn.execute(
@@ -97,10 +110,13 @@ impl Database {
     pub fn get_user_by_name(&self, name: &str) -> Result<User> {
         let conn = self.get_connection();
         let mut stmt = conn.prepare("SELECT * FROM Users WHERE name = :name")?;
-        let mut rows = stmt.query_map(named_params! {":name": name}, |row| {
-            Ok(User::from_row(row)?)
-        })?;
-        Ok(rows.next().unwrap()?)
+        let mut rows = stmt.query_map(named_params! {":name": name}, User::from_row)?;
+
+        match rows.next() {
+            Some(Ok(user)) => Ok(user),
+            Some(Err(e)) => Err(e),
+            None => Err(rusqlite::Error::QueryReturnedNoRows),
+        }
     }
 
     pub fn insert_account<A: BankAccount>(&self, account: &A) -> Result<()> {
@@ -138,16 +154,16 @@ impl Database {
             conn.prepare("SELECT * FROM Account WHERE account_number = :account_number")?;
         let mut rows = stmt
             .query_map(named_params! {":account_number": (account_number)}, |row| {
-                Ok(Account::from_row(row)?)
+                Account::from_row(row)
             })?;
-        Ok(rows.next().unwrap()?)
+        rows.next().unwrap()
     }
 
     pub fn get_accounts_by_user(&self, user_id: i64) -> Result<Vec<Account>> {
         let conn = self.get_connection();
         let mut stmt = conn.prepare("SELECT * FROM Account WHERE user_id = :user_id")?;
         let rows = stmt.query_map(named_params! {":user_id": user_id}, |row| {
-            Ok(Account::from_row(row)?)
+            Account::from_row(row)
         })?;
 
         let mut accounts = Vec::new();
@@ -170,11 +186,11 @@ impl Database {
         )?;
         if let Some(row_result) = rows.next() {
             match row_result {
-                Ok(account_number) => return Ok(account_number?),
-                Err(e) => return Err(e),
+                Ok(account_number) => account_number,
+                Err(e) => Err(e),
             }
         } else {
-            return Err(rusqlite::Error::QueryReturnedNoRows);
+            Err(rusqlite::Error::QueryReturnedNoRows)
         }
     }
 
@@ -272,6 +288,55 @@ mod tests {
             usd: 0.0,
             category: "Food".into(),
         }
+    }
+
+    #[test]
+    fn test_get_transactions() {
+        let db = setup_test_db();
+
+        db.insert_user(&sample_user()).unwrap();
+        db.insert_account(&sample_account()).unwrap();
+
+        let transaction1 = Transaction {
+            user_id: 1,
+            account_type: AccountType::Chequing,
+            account_number: 1001,
+            transaction_date: "2025-05-22".to_string(),
+            cheque_number: ("CHK001".to_string()),
+            description_1: ("Groceries".to_string()),
+            description_2: ("Walmart".to_string()),
+            cad: (150.25),
+            usd: 0.0,
+            category: ("Food".to_string()),
+        };
+
+        let transaction2 = Transaction {
+            user_id: 1,
+            account_type: AccountType::Chequing,
+            account_number: 1001,
+            transaction_date: "2025-05-21".to_string(),
+            cheque_number: "".to_string(),
+            description_1: ("Gas".to_string()),
+            description_2: ("Shell".to_string()),
+            cad: (60.0),
+            usd: 0.0,
+            category: ("Transport".to_string()),
+        };
+
+        db.insert_transaction(&transaction1).unwrap();
+        db.insert_transaction(&transaction2).unwrap();
+
+        let transactions = db.get_transactions(1).unwrap();
+
+        assert_eq!(transactions.len(), 2);
+
+        // Validate the content of the transactions
+        assert!(transactions
+            .iter()
+            .any(|t| t.description_1 == ("Groceries".to_string())));
+        assert!(transactions
+            .iter()
+            .any(|t| t.description_1 == ("Gas".to_string())));
     }
 
     #[test]

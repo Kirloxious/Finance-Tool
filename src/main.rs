@@ -1,11 +1,11 @@
 use dotenv::dotenv;
+use finance_tool::transaction::Transaction;
 use std::path::Path;
-use std::sync::Arc;
 
 use axum::extract::State;
 use axum::routing::get;
 use axum::{http::StatusCode, Json, Router};
-use finance_tool::account::{AccountType, BankAccount};
+use finance_tool::account::{Account, AccountType, BankAccount};
 use finance_tool::app::AppState;
 use finance_tool::catergorization::catergorize_transactions;
 use finance_tool::database::Database;
@@ -150,7 +150,9 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(root))
-        .route("/users/{username}", get(get_user))
+        .route("/users/{username}", get(login_user))
+        .route("/transactions", get(get_transactions))
+        .route("/accounts", get(get_accounts))
         .with_state(state);
 
     let listerner = tokio::net::TcpListener::bind(
@@ -163,23 +165,89 @@ async fn main() {
     axum::serve(listerner, app).await.unwrap();
 }
 
-async fn get_user(
+async fn root() -> (StatusCode, &'static str) {
+    (StatusCode::OK, "hello")
+}
+
+async fn login_user(
     axum::extract::Path(username): axum::extract::Path<String>,
-    State(mut state): State<AppState>,
+    State(state): State<AppState>,
 ) -> (StatusCode, Json<User>) {
     let conn = state.db.clone();
-    let user = task::spawn_blocking(move || {
+    let fetched_user = task::spawn_blocking(move || {
+        let conn = conn.lock().unwrap();
+        match conn.get_user_by_name(&username) {
+            Ok(user) => Some(user),
+            Err(e) => {
+                println!("Users does not exist: {}", e);
+                None
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let mut user = state.user.lock().unwrap();
+    *user = fetched_user.clone();
+
+    match fetched_user {
+        Some(user) => (StatusCode::OK, Json(user)),
+        None => (StatusCode::UNAUTHORIZED, Json(User::default())),
+    }
+}
+
+async fn _get_user(
+    axum::extract::Path(username): axum::extract::Path<String>,
+    State(state): State<AppState>,
+) -> (StatusCode, Json<User>) {
+    let conn = state.db.clone();
+    let fetched_user = task::spawn_blocking(move || {
         let conn = conn.lock().unwrap();
         conn.get_user_by_name(&username).unwrap()
     })
     .await
     .unwrap();
 
-    state.user = Arc::new(Some(user.clone()));
+    let mut user = state.user.lock().unwrap();
+    *user = Some(fetched_user.clone());
 
-    (StatusCode::OK, Json(user))
+    (StatusCode::OK, Json(fetched_user))
 }
 
-async fn root() -> &'static str {
-    "Hello, world!"
+async fn get_transactions(State(state): State<AppState>) -> (StatusCode, Json<Vec<Transaction>>) {
+    let conn = state.db.clone();
+
+    // if no user in state (logged in), return 401
+    let user_id = match state.user.lock().unwrap().as_ref() {
+        Some(user) => user.id,
+        None => return (StatusCode::UNAUTHORIZED, Json(Vec::new())),
+    };
+
+    let transactions = task::spawn_blocking(move || {
+        let conn = conn.lock().unwrap();
+        conn.get_transactions(user_id).unwrap()
+    })
+    .await
+    .unwrap();
+
+    (StatusCode::OK, Json(transactions))
+}
+
+async fn get_accounts(State(state): State<AppState>) -> (StatusCode, Json<Vec<Account>>) {
+    let conn = state.db.clone();
+
+    // if no user in state (logged in), return 401
+    let user_id = match state.user.lock().unwrap().as_ref() {
+        Some(user) => user.id,
+        None => return (StatusCode::UNAUTHORIZED, Json(Vec::new())),
+    };
+
+    let accounts = task::spawn_blocking(move || {
+        let conn = conn.lock().unwrap();
+        conn.get_accounts_by_user(user_id).unwrap()
+    })
+    .await
+    .unwrap();
+
+    (StatusCode::OK, Json(accounts))
 }

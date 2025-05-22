@@ -5,14 +5,14 @@ use crate::{database::Database, user::User};
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Mutex<Database>>,
-    pub user: Arc<Option<User>>,
+    pub user: Arc<Mutex<Option<User>>>,
 }
 
 impl AppState {
     pub fn new(db: Database) -> AppState {
         AppState {
             db: Arc::new(Mutex::new(db)),
-            user: Arc::new(None),
+            user: Arc::new(Mutex::new(None)),
         }
     }
 }

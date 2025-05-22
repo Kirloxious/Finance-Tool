@@ -27,7 +27,7 @@ impl Transaction {
         Transaction {
             user_id: 0,
             account_type: AccountType::Credit,
-            account_number: i64::max_value(),
+            account_number: i64::MAX,
             transaction_date: "".to_string(),
             cheque_number: "".to_string(),
             description_1: "TIM HORTONS #7525, NEPEAN".to_string(),
@@ -56,8 +56,8 @@ impl Transaction {
             account_number: calculate_hash(&parts[1].to_string().replace("-", "")),
             transaction_date: parts[2].to_string(),
             cheque_number: parts[3].to_string(),
-            description_1: parts[4].to_string(),
-            description_2: parts[5].to_string(),
+            description_1: parts[4].trim().replace("\"", "").to_string(),
+            description_2: parts[5].trim().replace("\"", "").to_string(),
             cad: parts[6].parse::<f64>().unwrap_or(0.0),
             usd: parts[7].parse::<f64>().unwrap_or(0.0),
             category: "".to_string(),
@@ -72,8 +72,8 @@ impl Transaction {
             account_number: calculate_hash(&parts[0].to_string().replace("-", "")),
             transaction_date: parts[1].to_string(),
             cheque_number: parts[2].to_string(),
-            description_1: parts[3].to_string(),
-            description_2: parts[4].to_string(),
+            description_1: parts[3].trim().replace("\"", "").to_string(),
+            description_2: parts[4].trim().replace("\"", "").to_string(),
             cad: parts[5].parse::<f64>().unwrap_or(0.0),
             usd: parts[6].parse::<f64>().unwrap_or(0.0),
             category: "".to_string(),
@@ -128,6 +128,21 @@ impl Transaction {
         }
 
         serde_json::json!({"name": name, "merchant": merchant, "amount": amount})
+    }
+
+    pub fn from_row(row: &rusqlite::Row) -> Result<Transaction, rusqlite::Error> {
+        Ok(Transaction {
+            user_id: row.get(1)?,
+            account_type: AccountType::from_str(&row.get::<_, String>(3)?).unwrap(),
+            account_number: row.get(2)?,
+            transaction_date: row.get(4)?,
+            cheque_number: row.get(5)?,
+            description_1: row.get(6)?,
+            description_2: row.get(7)?,
+            cad: row.get(8)?,
+            usd: row.get(9)?,
+            category: row.get(10)?,
+        })
     }
 }
 

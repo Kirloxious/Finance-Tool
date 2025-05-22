@@ -60,10 +60,10 @@ pub fn parse_csv_to_transactions(
         transactions.push(transaction);
     }
 
-    return Ok(transactions);
+    Ok(transactions)
 }
 
-fn _capture_groups(regex: &Regex, line: &String) -> Vec<String> {
+fn _capture_groups(regex: &Regex, line: &str) -> Vec<String> {
     regex
         .captures(line)
         .unwrap()
@@ -110,7 +110,7 @@ pub fn parse_extracted_transactions(
         }
 
         if !regex.is_match(&current_line) {
-            if transactions.len() > 0
+            if !transactions.is_empty()
                 && regex.is_match(&previous_line)
                 && current_line.split(" ").collect::<Vec<&str>>().len() < 5
             {
@@ -165,8 +165,8 @@ pub fn parse_extracted_transactions(
 
         let transaction = Transaction {
             user_id: 1,
-            account_type: account_type,
-            account_number: account_number,
+            account_type,
+            account_number,
             transaction_date: date,
             cheque_number: String::new(),
             description_1: description,
