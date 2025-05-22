@@ -1,3 +1,4 @@
+use dotenv::dotenv;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -5,7 +6,7 @@ use axum::extract::State;
 use axum::routing::get;
 use axum::{http::StatusCode, Json, Router};
 use finance_tool::account::{AccountType, BankAccount};
-use finance_tool::app::{App, AppState};
+use finance_tool::app::AppState;
 use finance_tool::catergorization::catergorize_transactions;
 use finance_tool::database::Database;
 use finance_tool::parser;
@@ -17,7 +18,7 @@ use tokio::task;
 // Reminder: Send errors upstream to deal with in main routine
 
 async fn _test_setup() -> Result<()> {
-    let db = Database::new("database/master.db3")?;
+    let db = Database::new(std::env::var("DATABASE_PATH").expect("DATABASE_PATH must be set"))?;
     // db._execute_schema()?;
 
     db.reset_values()?;
@@ -140,7 +141,10 @@ async fn _test_setup() -> Result<()> {
 
 #[tokio::main]
 async fn main() {
-    let db = Database::new("database/master.db3").unwrap();
+    dotenv().ok();
+
+    let db =
+        Database::new(std::env::var("DATABASE_PATH").expect("DATABASE_PATH must be set")).unwrap();
 
     let state = AppState::new(db);
 
@@ -149,9 +153,11 @@ async fn main() {
         .route("/users/{username}", get(get_user))
         .with_state(state);
 
-    let listerner = tokio::net::TcpListener::bind("127.0.0.1:3000")
-        .await
-        .unwrap();
+    let listerner = tokio::net::TcpListener::bind(
+        std::env::var("ADDR").unwrap_or("127.0.0.1:3000".to_string()),
+    )
+    .await
+    .unwrap();
 
     println!("Listening on port 3000");
     axum::serve(listerner, app).await.unwrap();

@@ -135,11 +135,11 @@ impl BankAccount for Account {
     }
 
     fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error> {
-        match row.get::<usize, String>(1)?.as_str() {
-            "savings" => SavingsAccount::from_row(row),
-            "credit" => CreditAccount::from_row(row),
-            "chequing" => ChequingAccount::from_row(row),
-            _ => Err(rusqlite::Error::QueryReturnedNoRows),
+        match AccountType::from_str(&row.get::<usize, String>(1)?).unwrap_or(AccountType::Unknown) {
+            AccountType::Savings => SavingsAccount::from_row(row),
+            AccountType::Credit => CreditAccount::from_row(row),
+            AccountType::Chequing => ChequingAccount::from_row(row),
+            _ => Err(rusqlite::Error::InvalidQuery),
         }
     }
 }
