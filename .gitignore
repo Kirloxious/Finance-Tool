@@ -1,5 +1,6 @@
 .env
 .vscode
+
 target
 data
 database
