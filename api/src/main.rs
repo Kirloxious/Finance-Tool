@@ -244,7 +244,11 @@ async fn get_accounts(State(state): State<AppState>) -> (StatusCode, Json<Vec<Ac
 
     let accounts = task::spawn_blocking(move || {
         let conn = conn.lock().unwrap();
-        conn.get_accounts_by_user(user_id).unwrap()
+        conn.get_accounts_by_user(user_id)
+            .unwrap()
+            .into_iter()
+            .map(|boxed_account| boxed_account.as_enum())
+            .collect()
     })
     .await
     .unwrap();

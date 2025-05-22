@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::Routable;
 
+trait FromRow: Sized {
+    fn from_row(row: &rusqlite::Row) -> Result<Box<dyn BankAccount>, rusqlite::Error>;
+}
+
 #[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize)]
 pub enum AccountType {
     Savings,
@@ -45,107 +49,26 @@ impl fmt::Display for AccountType {
     }
 }
 
+pub fn bank_account_from_row(row: &rusqlite::Row) -> Result<Box<dyn BankAccount>, rusqlite::Error> {
+    let account_type =
+        AccountType::from_str(&row.get::<_, String>(1)?).unwrap_or(AccountType::Unknown);
+    match account_type {
+        AccountType::Savings => SavingsAccount::from_row(row),
+        AccountType::Credit => CreditAccount::from_row(row),
+        AccountType::Chequing => ChequingAccount::from_row(row),
+        AccountType::Unknown => Err(rusqlite::Error::QueryReturnedNoRows),
+    }
+}
+
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum Account {
     Savings(SavingsAccount),
     Credit(CreditAccount),
     Chequing(ChequingAccount),
 }
 
-impl Routable for Account {
-    fn route() -> &'static str {
-        "/accounts"
-    }
-}
-
-impl BankAccount for Account {
-    fn deposit(&mut self, amount: f64) {
-        match self {
-            Account::Savings(account) => account.deposit(amount),
-            Account::Credit(account) => account.deposit(amount),
-            Account::Chequing(account) => account.deposit(amount),
-        }
-    }
-
-    fn withdraw(&mut self, amount: f64) {
-        match self {
-            Account::Savings(account) => account.withdraw(amount),
-            Account::Credit(account) => account.withdraw(amount),
-            Account::Chequing(account) => account.withdraw(amount),
-        }
-    }
-
-    fn balance(&self) -> f64 {
-        match self {
-            Account::Savings(account) => account.balance(),
-            Account::Credit(account) => account.balance(),
-            Account::Chequing(account) => account.balance(),
-        }
-    }
-
-    fn account_number(&self) -> &i64 {
-        match self {
-            Account::Savings(account) => account.account_number(),
-            Account::Credit(account) => account.account_number(),
-            Account::Chequing(account) => account.account_number(),
-        }
-    }
-
-    fn account_type(&self) -> AccountType {
-        match self {
-            Account::Savings(account) => account.account_type(),
-            Account::Credit(account) => account.account_type(),
-            Account::Chequing(account) => account.account_type(),
-        }
-    }
-
-    fn user_id(&self) -> i64 {
-        match self {
-            Account::Savings(account) => account.user_id(),
-            Account::Credit(account) => account.user_id(),
-            Account::Chequing(account) => account.user_id(),
-        }
-    }
-
-    fn credit_limit(&self) -> f64 {
-        match self {
-            Account::Credit(account) => account.credit_limit(),
-            _ => 0.0,
-        }
-    }
-
-    fn interest_rate(&self) -> f64 {
-        match self {
-            Account::Savings(account) => account.interest_rate(),
-            _ => 0.0,
-        }
-    }
-
-    fn set_balance(&mut self, balance: f64) {
-        match self {
-            Account::Savings(account) => account.set_balance(balance),
-            Account::Credit(account) => account.set_balance(balance),
-            Account::Chequing(account) => account.set_balance(balance),
-        }
-    }
-
-    fn set_credit_limit(&mut self, limit: f64) {
-        if let Account::Credit(account) = self {
-            account.set_credit_limit(limit)
-        }
-    }
-
-    fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error> {
-        match AccountType::from_str(&row.get::<usize, String>(1)?).unwrap_or(AccountType::Unknown) {
-            AccountType::Savings => SavingsAccount::from_row(row),
-            AccountType::Credit => CreditAccount::from_row(row),
-            AccountType::Chequing => ChequingAccount::from_row(row),
-            _ => Err(rusqlite::Error::InvalidQuery),
-        }
-    }
-}
-
-pub trait BankAccount {
+pub trait BankAccount: Send + Sync {
     fn user_id(&self) -> i64;
     fn deposit(&mut self, amount: f64);
     fn withdraw(&mut self, amount: f64);
@@ -156,7 +79,7 @@ pub trait BankAccount {
     fn interest_rate(&self) -> f64;
     fn set_balance(&mut self, balance: f64);
     fn set_credit_limit(&mut self, limit: f64);
-    fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error>;
+    fn as_enum(self: Box<Self>) -> Account;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -221,8 +144,14 @@ impl BankAccount for SavingsAccount {
         todo!();
     }
 
-    fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error> {
-        Ok(Account::Savings(SavingsAccount::new(
+    fn as_enum(self: Box<Self>) -> Account {
+        Account::Savings(*self)
+    }
+}
+
+impl FromRow for SavingsAccount {
+    fn from_row(row: &rusqlite::Row) -> Result<Box<dyn BankAccount>, rusqlite::Error> {
+        Ok(Box::new(SavingsAccount::new(
             row.get(0)?,
             row.get(2)?,
             row.get(3)?,
@@ -299,9 +228,14 @@ impl BankAccount for CreditAccount {
     fn set_credit_limit(&mut self, limit: f64) {
         self.credit_limit = limit;
     }
+    fn as_enum(self: Box<Self>) -> Account {
+        Account::Credit(*self)
+    }
+}
 
-    fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error> {
-        Ok(Account::Credit(CreditAccount::new(
+impl FromRow for CreditAccount {
+    fn from_row(row: &rusqlite::Row) -> Result<Box<dyn BankAccount>, rusqlite::Error> {
+        Ok(Box::new(CreditAccount::new(
             row.get(0)?,
             row.get(2)?,
             row.get(3)?,
@@ -364,8 +298,14 @@ impl BankAccount for ChequingAccount {
         todo!();
     }
 
-    fn from_row(row: &rusqlite::Row) -> Result<Account, rusqlite::Error> {
-        Ok(Account::Chequing(ChequingAccount::new(
+    fn as_enum(self: Box<Self>) -> Account {
+        Account::Chequing(*self)
+    }
+}
+
+impl FromRow for ChequingAccount {
+    fn from_row(row: &rusqlite::Row) -> Result<Box<dyn BankAccount>, rusqlite::Error> {
+        Ok(Box::new(ChequingAccount::new(
             row.get(0)?,
             row.get(2)?,
             row.get(3)?,

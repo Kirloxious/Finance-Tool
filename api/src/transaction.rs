@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::{
-    account::{Account, AccountType, ChequingAccount, CreditAccount, SavingsAccount},
+    account::{AccountType, BankAccount, ChequingAccount, CreditAccount, SavingsAccount},
     calculate_hash, Routable,
 };
 
@@ -80,21 +80,21 @@ impl Transaction {
         }
     }
 
-    pub fn extract_account(&self) -> Option<Account> {
+    pub fn extract_account(&self) -> Option<Box<dyn BankAccount>> {
         match self.account_type {
-            AccountType::Savings => Some(Account::Savings(SavingsAccount::new(
+            AccountType::Savings => Some(Box::new(SavingsAccount::new(
                 self.user_id,
                 self.account_number,
                 0.0,
                 0.0,
             ))),
-            AccountType::Credit => Some(Account::Credit(CreditAccount::new(
+            AccountType::Credit => Some(Box::new(CreditAccount::new(
                 self.user_id,
                 self.account_number,
                 0.0,
                 0.0,
             ))),
-            AccountType::Chequing => Some(Account::Chequing(ChequingAccount::new(
+            AccountType::Chequing => Some(Box::new(ChequingAccount::new(
                 self.user_id,
                 self.account_number,
                 0.0,

@@ -2,7 +2,7 @@ use rusqlite::named_params;
 use rusqlite::Connection;
 use rusqlite::Result;
 
-use crate::account::Account;
+use crate::account::bank_account_from_row;
 use crate::account::AccountType;
 use crate::account::BankAccount;
 use crate::transaction::Transaction;
@@ -119,7 +119,7 @@ impl Database {
         }
     }
 
-    pub fn insert_account<A: BankAccount>(&self, account: &A) -> Result<()> {
+    pub fn insert_account(&self, account: &Box<dyn BankAccount>) -> Result<()> {
         let conn = self.get_connection();
 
         conn.execute("INSERT INTO Account (user_id, account_type, account_number, balance, interest_rate, credit_limit) VALUES (?,?,?,?,?,?)", 
@@ -128,7 +128,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn update_account(&self, account: &Account) -> Result<()> {
+    pub fn update_account(&self, account: &Box<dyn BankAccount>) -> Result<()> {
         let conn = self.get_connection();
         conn.execute(
             "UPDATE Account SET balance = ?, interest_rate = ?, credit_limit = ? WHERE account_number = ?",
@@ -148,22 +148,22 @@ impl Database {
         Ok(rows.next().is_some())
     }
 
-    pub fn get_account(&self, account_number: &i64) -> Result<Account> {
+    pub fn get_account(&self, account_number: &i64) -> Result<Box<dyn BankAccount>> {
         let conn = self.get_connection();
         let mut stmt =
             conn.prepare("SELECT * FROM Account WHERE account_number = :account_number")?;
         let mut rows = stmt
             .query_map(named_params! {":account_number": (account_number)}, |row| {
-                Account::from_row(row)
+                bank_account_from_row(row)
             })?;
         rows.next().unwrap()
     }
 
-    pub fn get_accounts_by_user(&self, user_id: i64) -> Result<Vec<Account>> {
+    pub fn get_accounts_by_user(&self, user_id: i64) -> Result<Vec<Box<dyn BankAccount>>> {
         let conn = self.get_connection();
         let mut stmt = conn.prepare("SELECT * FROM Account WHERE user_id = :user_id")?;
         let rows = stmt.query_map(named_params! {":user_id": user_id}, |row| {
-            Account::from_row(row)
+            bank_account_from_row(row)
         })?;
 
         let mut accounts = Vec::new();
@@ -250,7 +250,7 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::account::{Account, AccountType, ChequingAccount};
+    use crate::account::{AccountType, BankAccount, ChequingAccount};
     use crate::transaction::Transaction;
     use crate::user::User;
 
@@ -267,8 +267,8 @@ mod tests {
         }
     }
 
-    fn sample_account() -> Account {
-        Account::Chequing(ChequingAccount {
+    fn sample_account() -> Box<dyn BankAccount> {
+        Box::new(ChequingAccount {
             user_id: 1,
             account_number: 1001,
             balance: 500.0,
