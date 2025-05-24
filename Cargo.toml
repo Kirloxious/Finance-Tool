@@ -1,7 +1,16 @@
 [workspace]
-members = ["api"]
+members = [
+    "api",
+    "web-app",
+]
 default-members = ["api"]
 resolver = "2"
 
 [workspace.package]
 rust-version = "1.87.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

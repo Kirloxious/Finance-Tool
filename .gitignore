@@ -1,6 +1,11 @@
+#Dotfiles
 .env
 .vscode
 
+#Folders
 target
 data
 database
+dist
+
+*.lock

@@ -13,7 +13,3 @@ fn calculate_hash<T: Hash>(t: &T) -> i64 {
     t.hash(&mut s);
     (s.finish() & 0x0000_FFFF_FFFF_FFFF) as i64
 }
-
-pub trait Routable {
-    fn route() -> &'static str;
-}

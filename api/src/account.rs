@@ -3,8 +3,6 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-use crate::Routable;
-
 trait FromRow: Sized {
     fn from_row(row: &rusqlite::Row) -> Result<Box<dyn BankAccount>, rusqlite::Error>;
 }

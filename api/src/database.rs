@@ -1,12 +1,10 @@
-use rusqlite::named_params;
-use rusqlite::Connection;
-use rusqlite::Result;
+use rusqlite::{named_params, Connection, Result};
 
-use crate::account::bank_account_from_row;
-use crate::account::AccountType;
-use crate::account::BankAccount;
-use crate::transaction::Transaction;
-use crate::user::User;
+use crate::{
+    account::{bank_account_from_row, AccountType, BankAccount},
+    transaction::Transaction,
+    user::User,
+};
 
 pub struct Database {
     _db_path: String,

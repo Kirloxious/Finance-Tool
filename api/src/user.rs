@@ -1,8 +1,6 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::Routable;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub name: String,
@@ -43,11 +41,5 @@ impl Default for User {
 impl std::fmt::Display for User {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
-    }
-}
-
-impl Routable for User {
-    fn route() -> &'static str {
-        "/users"
     }
 }

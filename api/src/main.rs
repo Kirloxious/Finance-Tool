@@ -1,21 +1,24 @@
 use dotenv::dotenv;
-use finance_tool::transaction::Transaction;
-use std::path::Path;
-
-use axum::extract::State;
-use axum::routing::get;
-use axum::{http::StatusCode, Json, Router};
-use finance_tool::account::{Account, AccountType, BankAccount};
-use finance_tool::app::AppState;
-use finance_tool::catergorization::catergorize_transactions;
-use finance_tool::database::Database;
-use finance_tool::parser;
-use finance_tool::user::User;
 use rusqlite::Result;
 use tokio::task;
 
-// TODO: Handle errors
-// Reminder: Send errors upstream to deal with in main routine
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
+};
+
+use finance_tool::{
+    account::{Account, AccountType},
+    app::AppState,
+    catergorization::catergorize_transactions,
+    database::Database,
+    parser,
+    transaction::Transaction,
+    user::User,
+};
 
 async fn _test_setup() -> Result<()> {
     let db = Database::new(std::env::var("DATABASE_PATH").expect("DATABASE_PATH must be set"))?;
@@ -28,9 +31,9 @@ async fn _test_setup() -> Result<()> {
 
     db.insert_user(&user)?;
 
-    let credit_path = Path::new("data/credit_data.txt");
-    let savings_path = Path::new("data/savings_data.txt");
-    let chequing_path = Path::new("data/chequing_data.txt");
+    let credit_path = std::path::Path::new("data/credit_data.txt");
+    let savings_path = std::path::Path::new("data/savings_data.txt");
+    let chequing_path = std::path::Path::new("data/chequing_data.txt");
 
     let mut chequing_balance = 0.0;
     let mut savings_balance = 0.0;
@@ -38,7 +41,8 @@ async fn _test_setup() -> Result<()> {
     let mut credit_limit = 0.0;
 
     let mut transactions =
-        parser::parse_csv_to_transactions(user.id, Path::new("data/csv48685.csv")).unwrap();
+        parser::parse_csv_to_transactions(user.id, std::path::Path::new("data/csv48685.csv"))
+            .unwrap();
 
     for transaction in &mut transactions {
         let acc = transaction.extract_account().unwrap();
@@ -155,22 +159,21 @@ async fn main() {
         .route("/accounts", get(get_accounts))
         .with_state(state);
 
-    let listerner = tokio::net::TcpListener::bind(
-        std::env::var("ADDR").unwrap_or("127.0.0.1:3000".to_string()),
-    )
-    .await
-    .unwrap();
+    let listerner =
+        tokio::net::TcpListener::bind(std::env::var("ADDR").unwrap_or("0.0.0.0:3000".to_string()))
+            .await
+            .unwrap();
 
     println!("Listening on port 3000");
     axum::serve(listerner, app).await.unwrap();
 }
 
-async fn root() -> (StatusCode, &'static str) {
-    (StatusCode::OK, "hello")
+async fn root() -> impl IntoResponse {
+    ("hello world").into_response()
 }
 
 async fn login_user(
-    axum::extract::Path(username): axum::extract::Path<String>,
+    Path(username): Path<String>,
     State(state): State<AppState>,
 ) -> (StatusCode, Json<User>) {
     let conn = state.db.clone();

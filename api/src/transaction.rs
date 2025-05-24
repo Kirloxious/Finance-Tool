@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::{
     account::{AccountType, BankAccount, ChequingAccount, CreditAccount, SavingsAccount},
-    calculate_hash, Routable,
+    calculate_hash,
 };
 
 use serde::{Deserialize, Serialize};
@@ -143,11 +143,5 @@ impl Transaction {
             usd: row.get(9)?,
             category: row.get(10)?,
         })
-    }
-}
-
-impl Routable for Transaction {
-    fn route() -> &'static str {
-        "/transactions"
     }
 }
